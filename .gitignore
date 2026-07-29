@@ -1,0 +1,42 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Dados, caches e bancos gerados
+resultado/
+resultado_*/
+resultado_excel/
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.parquet
+
+# Arquivos locais, downloads e planilhas
+*.xlsx
+*.xls
+~$*
+*.zip
+*.log
+.env
+.env.*
+!.env.example
+
+# Dependencias e builds do dashboard
+dashboard/node_modules/
+dashboard/.next/
+dashboard/.vinext/
+dashboard/dist/
+dashboard/out/
+dashboard/coverage/
+dashboard/.wrangler/
+dashboard/outputs/
+dashboard/work/
+
+# Backup recuperavel do repositorio Git vazio que existia no dashboard
+.dashboard_git_empty_backup_*/
