@@ -32,6 +32,7 @@ Atualizado em 28/07/2026, fuso America/Sao_Paulo.
 - CPU: 16 vCPUs dedicadas.
 - Memória: 64 GB de RAM.
 - Disco: Amazon EBS SSD gp3 de 500 GB.
+- Instalar e usar `tmux` para manter os processamentos ativos após desconexões SSH.
 - Estratégia inicial: preparar o projeto para Linux e executar uma fila com 8–10 workers,
   aumentando para 12 somente depois de medir CPU, RAM e espera de disco.
 - Código, documentação, `AGENTS.md` e `PROJECT_MEMORY.md` irão para repositório privado;
