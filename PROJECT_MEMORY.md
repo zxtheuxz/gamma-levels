@@ -17,6 +17,7 @@ Atualizado em 28/07/2026, fuso America/Sao_Paulo.
 ## Sistema atual
 
 - Projeto: `E:\gamma levels`
+- Repositório privado: `https://github.com/zxtheuxz/gamma-levels`, branch `main`.
 - API local: `http://127.0.0.1:8000`
 - Dashboard: `http://localhost:3000`
 - Versão ativa: 0.3.3
