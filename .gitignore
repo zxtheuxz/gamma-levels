@@ -22,10 +22,14 @@ data/
 *.xls
 ~$*
 *.zip
+*.pem
 *.log
 .env
 .env.*
 !.env.example
+
+# Credenciais e arquivos locais de conexao com a VPS
+vps/
 
 # Dependencias e builds do dashboard
 dashboard/node_modules/

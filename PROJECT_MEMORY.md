@@ -1,6 +1,6 @@
 # Memória persistente — Gamma Levels Swing CALL
 
-Atualizado em 28/07/2026, fuso America/Sao_Paulo.
+Atualizado em 29/07/2026, fuso America/Sao_Paulo.
 
 ## Objetivo e decisões do usuário
 
@@ -26,17 +26,32 @@ Atualizado em 28/07/2026, fuso America/Sao_Paulo.
 - Dashboard alterna PETR4, VALE3, ITUB4 e BBDC4 na aba Histórico.
 - A API é multiativo; usar `?ticker=TICKER` nos endpoints anuais.
 
-### VPS planejada para processamento em lote
+### VPS Ubuntu temporária
 
-- Sistema operacional: Ubuntu.
-- CPU: 16 vCPUs dedicadas.
-- Memória: 64 GB de RAM.
-- Disco: Amazon EBS SSD gp3 de 500 GB.
-- Instalar e usar `tmux` para manter os processamentos ativos após desconexões SSH.
-- Estratégia inicial: preparar o projeto para Linux e executar uma fila com 8–10 workers,
-  aumentando para 12 somente depois de medir CPU, RAM e espera de disco.
-- Código, documentação, `AGENTS.md` e `PROJECT_MEMORY.md` irão para repositório privado;
-  dados B3, caches, SQLite, planilhas, segredos e dependências geradas ficarão fora do Git.
+- VPS criada e acessada em uma sessão separada do Codex; esta sessão do Windows não controla a VPS.
+- A pasta local `vps/` foi criada para conexão e transferência e contém material SSH privado;
+  ela e arquivos `*.pem` devem permanecer ignorados pelo Git e nunca enviados ao GitHub.
+- CPU informada: Intel Xeon Platinum 8259CL, 8 núcleos/16 threads, tratada como 16 vCPUs
+  dedicadas conforme confirmação do usuário.
+- Memória real: aproximadamente 62 GiB utilizáveis (plano comercial de 64 GB), com cerca
+  de 60 GiB disponíveis no diagnóstico inicial.
+- Disco: Amazon EBS SSD gp3 de 500 GB, com aproximadamente 481 GiB livres no diagnóstico inicial.
+- Carga inicial praticamente ociosa; swap não configurado.
+- O usuário pediu uso de `tmux` para manter processos após desconexão SSH; instalação efetiva
+  deve ser confirmada na própria VPS.
+- Estratégia de workers: começar com 8, medir CPU/RAM/espera de disco, depois testar 10 e 12.
+- Inventário informado na VPS: cerca de 93 GB no total, sendo 88 GB de arquivos brutos B3
+  dos 345 pregões, 834 MB de cache interpretado, 3,9 GB de bancos de estudos/resultados
+  e aproximadamente 13 MB de logs.
+- Os créditos da VPS são temporários e o usuário pretende encerrá-la. Antes de terminar a
+  instância ou apagar o EBS, preservar obrigatoriamente bancos, logs, rankings, manifestos,
+  configurações e hashes; confirmar tamanho e SHA-256 depois da transferência.
+- Para analisar estudos como PETR4/VALE3/ITUB4/BBDC4, os bancos SQLite completos são suficientes:
+  permitem métricas, operações, entradas, saídas, MFE, MAE, drawdown e divisões amostrais.
+  Os 88 GB brutos e o cache não são necessários para examinar resultados já calculados, mas
+  seriam necessários para recalcular com novas regras ou auditar novamente a fonte B3.
+- Código, documentação, `AGENTS.md` e `PROJECT_MEMORY.md` ficam no repositório privado;
+  dados B3, caches, SQLite, planilhas, segredos e dependências geradas ficam fora do Git.
 
 Endpoints principais:
 
@@ -135,11 +150,15 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 ## Dados e preservação
 
 - PETR4, VALE3, ITUB4 e BBDC4 usam bancos separados; um estudo não sobrescreve outro.
-- Arquivos brutos B3 ficam em `data/raw` (última medição: 1.036 arquivos, cerca de 3,05 GB).
+- No Windows, arquivos brutos B3 ficam em `data/raw` (medição histórica: 1.036 arquivos,
+  cerca de 3,05 GB). Não confundir esse conjunto local com os cerca de 88 GB informados na VPS.
 - Cache interpretado por ativo/pregão fica em `data/parsed` usando Parquet com Zstandard.
 - `GET /api/backtest/latest` limita a lista exibida; 1.000 linhas retornadas não são o total oficial.
 - Métricas e trajetórias oficiais ficam no SQLite de cada ativo.
 - Os dados estão persistidos localmente, mas não constituem backup externo.
+- Para encerrar a VPS com segurança, o pacote mínimo deve conter os aproximadamente 3,9 GB
+  de bancos, 13 MB de logs, rankings, manifestos, configurações e checksums. Não considerar
+  o backup concluído até baixar o pacote e conferir o SHA-256 fora da VPS.
 
 ## Otimizações implementadas
 
@@ -161,13 +180,15 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 ## Como retomar rapidamente
 
 1. Ler este arquivo inteiro.
-2. Consultar `http://127.0.0.1:8000/api/health`.
-3. Consultar o status do ativo em andamento, atualmente BBDC4.
-4. Se os serviços não responderem, executar `scripts/start_dashboard.ps1`.
-5. Se o estudo foi interrompido, reenviar `POST /api/backtest` com ticker, raiz, 345 sessões,
-   aquecimento 50, avaliação 252 e custos zero; ele retoma os pregões persistidos.
-6. Quando BBDC4 terminar, atualizar aqui os melhores resultados completos e fora da amostra.
-7. Não escolher apenas o maior número: observar operações, PF, expectativa, estabilidade e drawdown.
+2. Identificar se a sessão está no Windows local ou na VPS Ubuntu; são ambientes separados.
+3. Se a VPS ainda existir, priorizar a criação, transferência e validação do backup mínimo antes
+   de qualquer encerramento. Não há confirmação nesta memória de que o backup já foi transferido.
+4. Garantir que alterações de código e desta memória foram commitadas e enviadas ao GitHub.
+5. No Windows, consultar `http://127.0.0.1:8000/api/health`; se necessário, executar
+   `scripts/start_dashboard.ps1`.
+6. BBDC4 já terminou; não existe backtest em andamento confirmado nesta memória.
+7. Depois de receber os bancos da VPS, integrá-los ao dashboard e gerar ranking consolidado.
+8. Não escolher apenas o maior número: observar operações, PF, expectativa, estabilidade e drawdown.
 
 Próximos candidatos líquidos observados em 27/07/2026: PRIO3, BBAS3, GGBR4, WEGE3 e B3SA3.
 BRAV3 tinha volume muito alto, mas exige avaliar continuidade histórica e eventos corporativos antes do anual.
