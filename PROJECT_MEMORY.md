@@ -177,8 +177,9 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
   a maior expectativa bruta.
 - Distribuição dos 75 ativos: 2 `STRICTLY_STABLE`, 5 `POSITIVE_TRAIN_AND_OOS`,
   3 `POSITIVE_FULL_ONLY`, 34 `LOW_SAMPLE` e 31 `NO_TRADES`.
-- Somente VALE3 e BBDC4 passaram o critério estrito com amostra >=10. Nenhum dos 71 ativos novos
-  passou simultaneamente treino, validation_1 e validation_2 nesse tamanho de amostra.
+- Somente VALE3 e BBDC4 passaram o critério estrito do relatório com amostra >=10. Nenhum dos
+  71 ativos novos passou simultaneamente treino, validation_1 e validation_2 nesse tamanho de
+  amostra. Isso descreve apenas essa régua conservadora por ativo; não significa que a cesta falhou.
 - Entre os novos, PETR3, CMIG4, BBAS3 e B3SA3 tiveram combinação com >=10 operações e resultado
   positivo no treino e no OOS agregado, mas falharam estabilidade por validation_2 negativa ou
   sem operações. PRIO3 teve treino negativo; USIM5 não teve operações no treino.
@@ -187,6 +188,36 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
   divisões positivas; ainda assim, sete operações não permitem tratá-la como evidência robusta.
 - PRIO3 também produziu números brutos muito altos com nove operações no baseline até o
   vencimento, mas permanece abaixo da amostra mínima e não deve ser promovida só pelo retorno.
+
+### Auditoria corretiva da interpretação da cesta em 30/07/2026
+
+- A conclusão inicial de que "nenhum dos 71 funcionou" estava errada: ela comparava o melhor
+  resultado exploratório entre 114 combinações dos quatro ativos originais com uma exigência
+  posterior muito mais dura aplicada aos 71. Não repetir essa comparação assimétrica.
+- Integridade confirmada nos dois ativos com raiz sobreposta: nos 344 pregões comuns,
+  PETR4 teve 344/344 linhas do subjacente e 804.464/804.464 cotações de opções idênticas;
+  BBDC4 teve 344/344 e 538.092/538.092, respectivamente. `study.py`, `swing.py` e `storage.py`
+  também tinham SHA-256 idêntico no Windows e na VPS. Não foi encontrada corrupção ou
+  diferença de cálculo na VPS.
+- Auditoria honesta por ativo, escolhendo a combinação somente pelo treino com >=3 operações
+  e avaliando a mesma combinação no OOS: os quatro originais somaram 32 operações no treino,
+  expectativa +61,25%, mas 18 no OOS com expectativa -25,29%; apenas 1/4 ficou positivo. Logo,
+  a impressão de que os quatro haviam funcionado decorreu em grande parte de seleção retrospectiva.
+- Pela mesma auditoria nos 71 novos, 15 ativos tinham escolha elegível no treino: 77 operações,
+  expectativa +42,70%. A mesma escolha no OOS somou 37 operações, expectativa +37,96%, com
+  seis ativos positivos entre os 13 que efetivamente operaram no OOS.
+- Como o objetivo da cesta é capturar poucos sinais em muitos ativos, a unidade principal deve ser
+  uma regra global agregada, e não exigir dez operações de cada ticker. Nos 71 da VPS,
+  `baseline_v0 + CALCULATED_EXIT` teve no treino 36 operações, expectativa +13,05% e PF 2,04;
+  no OOS, 61 operações, expectativa +3,93% e PF 1,31. Limitando cronologicamente a uma única
+  posição global por vez, o OOS permaneceu positivo: 17 operações, 52,9% de acerto,
+  expectativa +5,66% e PF 1,47.
+- Nos 75 ativos, uma regra escolhida pelo treino, `score_85 + CALCULATED_EXIT`, teve 48 operações
+  no treino com expectativa +13,87% e PF 1,59; no OOS foram 46 operações, expectativa +9,44%
+  e PF 1,36. Com uma posição global por vez no OOS: 13 operações, expectativa +8,74% e PF 1,30.
+- Esses percentuais são retornos por operação em opções e ainda não representam retorno de
+  carteira, pois faltam dimensionamento, capital compartilhado, custos, slippage e curva patrimonial.
+  O próximo teste correto é uma simulação de portfólio cronológica com essas restrições.
 
 ## Dados e preservação
 
