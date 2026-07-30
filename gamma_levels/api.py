@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import io
+import sqlite3
 from datetime import date
+from pathlib import Path
 from typing import Annotated
 
 import pandas as pd
@@ -37,6 +39,31 @@ def annual_service(ticker: str = "PETR4") -> StudyService:
     return study_services[wanted]
 
 
+def available_backtests(data_root: Path | None = None) -> list[dict[str, object]]:
+    root = data_root or Path(__file__).resolve().parents[1] / "data"
+    preferred = {ticker: index for index, ticker in enumerate(("PETR4", "VALE3", "ITUB4", "BBDC4"))}
+    results: list[dict[str, object]] = []
+    for database in root.glob("pilot_*/gamma_levels.db"):
+        ticker = database.parent.name.removeprefix("pilot_").upper()
+        try:
+            connection = sqlite3.connect(f"file:{database.resolve().as_posix()}?mode=ro", uri=True)
+            connection.row_factory = sqlite3.Row
+            run = connection.execute(
+                """SELECT id,ticker,status,first_date,last_date,evaluated_sessions
+                   FROM backtest_runs ORDER BY id DESC LIMIT 1"""
+            ).fetchone()
+        except sqlite3.Error:
+            run = None
+        finally:
+            if "connection" in locals():
+                connection.close()
+                del connection
+        if run is not None and run["status"] == "COMPLETE":
+            results.append(dict(run))
+    results.sort(key=lambda item: (preferred.get(str(item["ticker"]), len(preferred)), str(item["ticker"])))
+    return results
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "version": "0.3.3"}
@@ -66,6 +93,12 @@ def backtest(payload: dict[str, object] | None = Body(default=None)) -> dict[str
 @app.get("/api/backtest/status")
 def backtest_status(ticker: str = "PETR4") -> dict[str, object]:
     return annual_service(ticker).status()
+
+
+@app.get("/api/backtest/tickers")
+def backtest_tickers() -> dict[str, object]:
+    studies = available_backtests()
+    return {"count": len(studies), "tickers": studies}
 
 
 @app.get("/api/backtest/latest")

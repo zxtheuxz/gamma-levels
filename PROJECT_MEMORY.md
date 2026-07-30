@@ -1,6 +1,6 @@
 # Memória persistente — Gamma Levels Swing CALL
 
-Atualizado em 29/07/2026, fuso America/Sao_Paulo.
+Atualizado em 30/07/2026, fuso America/Sao_Paulo.
 
 ## Objetivo e decisões do usuário
 
@@ -23,8 +23,9 @@ Atualizado em 29/07/2026, fuso America/Sao_Paulo.
 - Versão ativa: 0.3.3
 - Iniciador: `scripts/start_dashboard.ps1`
 - Execução manual PETR4: `Executar_Backtest_Anual_PETR4.cmd`
-- Dashboard alterna PETR4, VALE3, ITUB4 e BBDC4 na aba Histórico.
+- Dashboard lista dinamicamente os 75 estudos completos disponíveis na aba Histórico.
 - A API é multiativo; usar `?ticker=TICKER` nos endpoints anuais.
+- `GET /api/backtest/tickers` lista os bancos com run final `COMPLETE`.
 
 ### VPS Ubuntu temporária
 
@@ -52,6 +53,12 @@ Atualizado em 29/07/2026, fuso America/Sao_Paulo.
   seriam necessários para recalcular com novas regras ou auditar novamente a fonte B3.
 - Código, documentação, `AGENTS.md` e `PROJECT_MEMORY.md` ficam no repositório privado;
   dados B3, caches, SQLite, planilhas, segredos e dependências geradas ficam fora do Git.
+- Em 30/07/2026 a fila da VPS já havia terminado e foi consultada por SSH. Não havia
+  `batch_cli`, `monitor_cli` ou backtest ativo; somente a sessão tmux/Codex permaneceu aberta.
+- O pacote validado foi transferido para `vps/results/gamma-results-20260730.tar.zst` no Windows:
+  606.342.028 bytes, SHA-256 `e60163293ca3ef3e68e192b885bb13d591254be8bed5cedaa573ae72b8d80754`.
+  O pacote contém os 71 bancos completos, logs, lista, status e manifestos, mas não contém
+  `.env.telegram`, dados brutos ou caches. Não é necessário baixá-lo novamente.
 
 Endpoints principais:
 
@@ -147,9 +154,44 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 - Alvos atingidos pela combinação de região 50: 10% em 17/17, 25% em 16/17,
   50% em 12/17 e 100% em 7/17.
 
+### Cesta da VPS — 71 bancos integrados em 30/07/2026
+
+- Fila final: 71/79 estudos completos e 8 erros. Os 71 bancos foram abertos em modo somente
+  leitura, passaram `PRAGMA quick_check`, tiveram SHA-256 calculado na VPS e foram novamente
+  validados após a extração no Windows; houve zero divergência de hash.
+- Os oito excluídos da integração oficial foram AXIA3, AXIA6, AXIA7, EMBJ3, MBRF3, MOTV3,
+  NATU3 e POMO4. Os sete primeiros não completaram a janela histórica; POMO4 tem banco íntegro,
+  mas run final `INCOMPLETE`, 780 métricas e mensagem de resultado parcial, por isso não entra.
+- Total local após a integração: 75 bancos `COMPLETE` e íntegros — os 71 da VPS mais PETR4,
+  VALE3, ITUB4 e BBDC4. Os quatro bancos originais permaneceram intocados.
+- Relatório consolidado: `resultado_excel/ranking_consolidado_75_ativos.xlsx`, com as abas
+  `Resumo_Ativos`, `Ranking_Estavel`, `Treino_e_OOS`, `Todas_Combinacoes` e `Metodologia`.
+  Versão auditável em JSON: `resultado_excel/ranking_consolidado_75_ativos.json`.
+- A estrutura e os valores da planilha foram reabertos programaticamente, mas a verificação
+  visual especializada com `artifact-tool` não pôde ser executada porque o carregador obrigatório
+  dessa ferramenta não estava disponível na sessão; o JSON é a referência auditável principal.
+- Critério comparativo principal do relatório: posições independentes, pelo menos 10 operações
+  no período completo. Classificação estritamente estável exige treino >=3 operações,
+  validation_1 >=2, validation_2 >=2 e expectativa positiva no completo e em cada divisão.
+  A ordenação usa primeiro a pior expectativa entre as três divisões, evitando escolher apenas
+  a maior expectativa bruta.
+- Distribuição dos 75 ativos: 2 `STRICTLY_STABLE`, 5 `POSITIVE_TRAIN_AND_OOS`,
+  3 `POSITIVE_FULL_ONLY`, 34 `LOW_SAMPLE` e 31 `NO_TRADES`.
+- Somente VALE3 e BBDC4 passaram o critério estrito com amostra >=10. Nenhum dos 71 ativos novos
+  passou simultaneamente treino, validation_1 e validation_2 nesse tamanho de amostra.
+- Entre os novos, PETR3, CMIG4, BBAS3 e B3SA3 tiveram combinação com >=10 operações e resultado
+  positivo no treino e no OOS agregado, mas falharam estabilidade por validation_2 negativa ou
+  sem operações. PRIO3 teve treino negativo; USIM5 não teve operações no treino.
+- ITSA4 é o destaque exploratório de baixa amostra: `score_75 + PARTIAL_25_CALCULATED`,
+  7 operações, 85,7% de acerto, expectativa +44,93%, PF 70,56 e OOS +59,79%, com todas as
+  divisões positivas; ainda assim, sete operações não permitem tratá-la como evidência robusta.
+- PRIO3 também produziu números brutos muito altos com nove operações no baseline até o
+  vencimento, mas permanece abaixo da amostra mínima e não deve ser promovida só pelo retorno.
+
 ## Dados e preservação
 
-- PETR4, VALE3, ITUB4 e BBDC4 usam bancos separados; um estudo não sobrescreve outro.
+- Os 75 estudos completos usam bancos separados em `data/pilot_<ticker>/gamma_levels.db`;
+  um estudo não sobrescreve outro.
 - No Windows, arquivos brutos B3 ficam em `data/raw` (medição histórica: 1.036 arquivos,
   cerca de 3,05 GB). Não confundir esse conjunto local com os cerca de 88 GB informados na VPS.
 - Cache interpretado por ativo/pregão fica em `data/parsed` usando Parquet com Zstandard.
@@ -159,6 +201,9 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 - Para encerrar a VPS com segurança, o pacote mínimo deve conter os aproximadamente 3,9 GB
   de bancos, 13 MB de logs, rankings, manifestos, configurações e checksums. Não considerar
   o backup concluído até baixar o pacote e conferir o SHA-256 fora da VPS.
+- Essa transferência mínima foi concluída e conferida no Windows em 30/07/2026. Os 88 GB brutos
+  e o cache da VPS continuam dispensáveis para analisar os estudos já calculados, mas ainda são
+  necessários se Matheus quiser recalcular novas regras sem baixar os pregões novamente.
 
 ## Otimizações implementadas
 
@@ -173,21 +218,26 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 
 ## Validação técnica
 
-- 26 testes Python aprovados; lint e build do dashboard aprovados.
+- Após a integração da cesta, 27 testes Python foram aprovados no Windows; lint e build do
+  dashboard também foram aprovados.
 - Um sinal VALE3 de 08/07/2025 foi recalculado após a otimização e manteve exatamente
   status, score 81,5, CALL VALEG565, prêmio máximo, suporte e resistência.
+- `scripts/validate_result_banks.py` valida integridade, run final, contagens e SHA-256 dos bancos.
+- `scripts/analyze_result_universe.py` reproduz a classificação e a planilha consolidada.
+- A API reiniciada em 30/07/2026 respondeu 75 ativos em `/api/backtest/tickers`; BBAS3 foi
+  consultada pela API e retornou run `COMPLETE` com 1.140 métricas.
 
 ## Como retomar rapidamente
 
 1. Ler este arquivo inteiro.
 2. Identificar se a sessão está no Windows local ou na VPS Ubuntu; são ambientes separados.
-3. Se a VPS ainda existir, priorizar a criação, transferência e validação do backup mínimo antes
-   de qualquer encerramento. Não há confirmação nesta memória de que o backup já foi transferido.
+3. O backup mínimo da VPS já foi transferido e validado; não repetir. Antes de encerrar a VPS,
+   decidir apenas se os 88 GB brutos/cache também serão preservados para futuros recálculos.
 4. Garantir que alterações de código e desta memória foram commitadas e enviadas ao GitHub.
 5. No Windows, consultar `http://127.0.0.1:8000/api/health`; se necessário, executar
    `scripts/start_dashboard.ps1`.
-6. BBDC4 já terminou; não existe backtest em andamento confirmado nesta memória.
-7. Depois de receber os bancos da VPS, integrá-los ao dashboard e gerar ranking consolidado.
+6. A fila da VPS terminou; não existe backtest em andamento confirmado nesta memória.
+7. Os bancos da VPS já estão integrados ao dashboard e o ranking consolidado já foi gerado.
 8. Não escolher apenas o maior número: observar operações, PF, expectativa, estabilidade e drawdown.
 
 Próximos candidatos líquidos observados em 27/07/2026: PRIO3, BBAS3, GGBR4, WEGE3 e B3SA3.

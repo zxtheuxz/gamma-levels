@@ -16,7 +16,7 @@
 * { box-sizing: border-box; }
 html { background: var(--bg); color-scheme: dark; }
 body { margin: 0; background: radial-gradient(circle at 72% -10%, #163128 0, var(--bg) 34rem); color: var(--text); font-family: var(--font-geist-sans), Arial, sans-serif; }
-button, a { font: inherit; }
+button, a, select { font: inherit; }
 button { color: inherit; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 244px minmax(0, 1fr); }
@@ -48,6 +48,7 @@ h2 { margin-bottom: 0; font-size: 21px; letter-spacing: -.025em; }
 .header-actions { display: flex; gap: 9px; }
 .ghost-button, .refresh-button { min-height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .ghost-button { color: var(--text); background: var(--panel); }
+.study-select { min-width: 108px; color-scheme: dark; }
 .refresh-button { border-color: var(--green); background: var(--green); color: #062318; font-weight: 700; }
 .refresh-button:disabled { opacity: .55; cursor: wait; }
 
