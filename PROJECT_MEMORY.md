@@ -14,6 +14,63 @@ Atualizado em 30/07/2026, fuso America/Sao_Paulo.
 - Prioridade: poucos sinais seletivos, várias ações líquidas e validação histórica auditável.
 - Estudos devem usar as mesmas regras entre ativos para permitir comparação justa.
 
+### Listas de ativos definidas em 30/07/2026
+
+- Cesta candidata operacional definida pelo usuário: VALE3, BBDC4, PETR3, BBAS3, B3SA3,
+  CMIG4, ITUB4, PRIO3, USIM5, PETR4 e ITSA4. A inclusão na cesta não substitui o sinal:
+  uma operação continua exigindo que a regra global/operacional gere entrada e cumpra os filtros.
+- Nível de evidência dentro da cesta: VALE3 e BBDC4 são os mais consistentes; PETR3, BBAS3,
+  B3SA3, CMIG4 e ITUB4 ficaram positivos em treino e OOS no ranking descritivo; PRIO3, USIM5
+  e PETR4 ficaram positivos apenas no agregado; ITSA4 é inclusão exploratória de baixa amostra.
+- Fila separada para aprofundar estudos, ainda fora da cesta candidata operacional: RENT3,
+  SUZB3 e DIRR3. Seus resultados atuais são, respectivamente, +279,90% com 1 operação,
+  +136,13% com 2 e +122,22% com 1; são observações exploratórias, não evidência suficiente.
+- O snapshot antigo de 27–28/07 foi superado pela atualização oficial iniciada em 30/07/2026.
+  A API principal completou 120 pregões e incorporou o fechamento de 29/07/2026. O scanner
+  baseline do universo top-20 encontrou zero `COMPRAR CALL`, 9 `AGUARDAR` e 11 `DESCARTAR`.
+  A validação histórica de 69 datas continuou em segundo plano depois que o ranking atual já
+  havia sido calculado e persistido.
+- Recalculo somente leitura da cesta operacional na data 29/07, usando para cada ticker a variante
+  que o colocou na lista: zero ativações; BBDC4, PETR3, BBAS3, ITUB4, PRIO3 e PETR4 ficaram em
+  `AGUARDAR`; VALE3, B3SA3, CMIG4, USIM5 e ITSA4 ficaram em `DESCARTAR`.
+- Mais próximos nesse snapshot: PETR4 tinha score 79,52 ante piso 85, CALL `PETRH427`, RR 1,98
+  e projeção conservadora de 5 dias +65,25%, mas ainda sem setup; BBAS3 tinha score 68,76 ante
+  piso 75, CALL `BBASH205`, RR 1,98 e projeção +19,28%, também sem setup; PRIO3 tinha score
+  79,31 ante piso 80 e RR 1,58, mas sem setup e sem CALL aprovada. Nenhum deles estava pronto
+  para entrada; não antecipar sinal.
+
+## Rotina diária D-1 da cesta (criada em 30/07/2026)
+
+- Script: `scripts/daily_basket_scan.py`. O usuário decidiu que ele é disparado sob demanda
+  nesta sessão, sem agendamento no Windows e sem `.cmd` na raiz.
+- O script ingere todo pregão publicado entre a última sessão do banco e ontem, varrendo dia
+  a dia. Isso é deliberado: `latest_available_date()` da B3 às vezes ignora o pregão mais
+  recente — em 30/07/2026 ele devolveu 28/07 mesmo com 29/07 já publicado e carregado.
+- Cada ticker é lido duas vezes no mesmo pregão: com a variante que o colocou na cesta e com
+  a regra global `score_85`. As duas leituras aparecem lado a lado; nenhuma substitui a outra.
+- As variantes não são redefinidas no script: ele importa `standard_variants()` de `study.py`,
+  então o cálculo diário usa exatamente o mesmo código do backtest anual.
+- Ativação exige o conjunto completo da regra: score >= piso, RSI >= piso da variante, setup
+  presente, CALL aprovada nos filtros, RR >= mínimo e projeção conservadora de 5 dias >= 10%.
+  Quando não ativa, o script imprime qual condição faltou. Não antecipar sinal.
+- Alerta por Telegram só quando algum ticker vira `COMPRAR CALL`; `--sempre` força o envio.
+  Credenciais em `.env.telegram` na raiz, ignorado pelo Git via `.env.*`; nunca commitar.
+  Canal validado com envio real em 30/07/2026. Outras opções (`--sem-download`, `--sem-telegram`,
+  `--data`, `--tickers`) existem para auditoria pontual.
+- O usuário optou por não gerar JSON, Markdown ou Excel diário; a saída é console mais Telegram.
+  Portanto não há histórico persistido das verificações diárias até que ele peça.
+- `scripts/extend_daily_history.py` elevou o banco diário de 120 para 150 pregões em 30/07/2026,
+  cobrindo agora 18/12/2025 a 29/07/2026. O motivo é que o estudo anual usa 140 pregões de
+  contexto e o banco diário nascera com 120, produzindo números levemente diferentes.
+- Leitura oficial de 29/07/2026 já com 150 pregões: zero ativações nas 20 leituras. `AGUARDAR`
+  em BBDC4, PETR3, BBAS3, ITUB4, PRIO3 e PETR4; `DESCARTAR` em VALE3, B3SA3, CMIG4, USIM5 e
+  ITSA4. Nenhum ativo tinha setup — esse foi o bloqueio comum a todos.
+- A janela maior mudou levemente os scores ante o recálculo com 120 pregões: PETR4 79,39 (era
+  79,52), BBAS3 69,01 (era 68,76) e PRIO3 81,81 (era 79,31). Pela regra global, PRIO3 marcou
+  88,27 acima do piso 85, mas continuou sem setup e sem CALL aprovada, logo sem entrada.
+- Observação a vigiar: a projeção de 5 dias de PETR3 saiu em +741,24% com a CALL `PETRH452` e
+  RR 1,19. É um número de CALL muito barata, não um sinal; o RR abaixo do mínimo já a bloqueava.
+
 ## Sistema atual
 
 - Projeto: `E:\gamma levels`
@@ -201,6 +258,16 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
   divisões positivas; ainda assim, sete operações não permitem tratá-la como evidência robusta.
 - PRIO3 também produziu números brutos muito altos com nove operações no baseline até o
   vencimento, mas permanece abaixo da amostra mínima e não deve ser promovida só pelo retorno.
+- Auditoria adicional dos 34 ativos `LOW_SAMPLE` em 30/07/2026: somente 10 tinham pelo menos
+  três operações no treino para permitir uma escolha minimamente auditável por ativo. Escolhendo
+  a combinação exclusivamente pela maior expectativa no treino, eles somaram 35 operações,
+  74,3% de acerto, expectativa +41,48% e PF 3,66. A mesma escolha no OOS somou 21 operações,
+  28,6% de acerto, expectativa -41,90% e PF 0,20; oito ativos operaram e somente BRAV3 ficou
+  positivo (`score_75 + LADDER_25_50_100`, 3 trades OOS, +58,33%). CSNA3 e RADL3 não tiveram
+  trade OOS. Isso confirma forte sobreajuste quando se tenta otimizar individualmente os ativos
+  com pouca amostra.
+- ITSA4 não entrou nessa auditoria train-only porque sua combinação destacada tinha apenas duas
+  operações no treino. Continua sendo candidata a validação futura, não regra comprovada.
 
 ### Auditoria corretiva da interpretação da cesta em 30/07/2026
 
@@ -228,6 +295,21 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 - Nos 75 ativos, uma regra escolhida pelo treino, `score_85 + CALCULATED_EXIT`, teve 48 operações
   no treino com expectativa +13,87% e PF 1,59; no OOS foram 46 operações, expectativa +9,44%
   e PF 1,36. Com uma posição global por vez no OOS: 13 operações, expectativa +8,74% e PF 1,30.
+- Análise de concentração da mesma regra global em 30/07/2026: 20 ativos efetivamente
+  operaram no OOS, sendo 11 com expectativa positiva e 9 negativa. Excluindo apenas os ativos
+  com uma única operação OOS, restaram 37 operações com expectativa +9,52% e PF 1,41;
+  portanto, a vantagem agregada não depende dos resultados isolados de um único trade.
+  O teste leave-one-asset-out permaneceu positivo em todos os casos: a menor expectativa foi
+  +4,13% sem BBAS3, +4,99% sem RENT3, +5,09% sem VALE3 e +6,59% sem BBDC4.
+- Maiores contribuições OOS independentes para `score_85 + CALCULATED_EXIT`: BBAS3 (3 trades,
+  +85,67%), VALE3 (7, +33,72%), BBDC4 (4, +39,43%) e RENT3 (1, +209,95%). Maiores detratores:
+  PETR3 (2, -56,41%), BEEF3 (1, -100%), CSAN3 (1, -100%), BRAP4 (2, -48,16%) e PETR4
+  (3, -27,01%). Não excluir ou promover tickers com base nessa observação OOS isolada,
+  pois isso voltaria a introduzir seleção retrospectiva.
+- O campo `selected_*` do ranking consolidado é descritivo, não uma recomendação direta:
+  para `POSITIVE_TRAIN_AND_OOS`, o script escolhe entre as combinações consistentes aquela com
+  maior expectativa OOS; para `STRICTLY_STABLE`, usa todas as divisões. Esses campos servem para
+  descobrir candidatos, mas não constituem uma validação OOS intocada para selecionar regra por ativo.
 - Esses percentuais são retornos por operação em opções e ainda não representam retorno de
   carteira, pois faltam dimensionamento, capital compartilhado, custos, slippage e curva patrimonial.
   O próximo teste correto é uma simulação de portfólio cronológica com essas restrições.
@@ -264,6 +346,15 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 
 - Após a integração da cesta, 27 testes Python foram aprovados no Windows; lint e build do
   dashboard também foram aprovados.
+- Auditoria de equivalência local versus VPS em 30/07/2026: os 71 runs completos da VPS
+  registram a mesma configuração dos quatro locais (345 sessões carregadas, 50 de aquecimento,
+  `standard_v1`, custos zero, ações corporativas e juros completos) e usam as mesmas 19 variantes,
+  6 estratégias de saída, 2 modos de sobreposição e 5 amostras quando essas variantes geram trades.
+  Dos 71, 20 materializaram as 1.140 linhas de métricas, 20 materializaram subconjuntos em múltiplos
+  de 60 e 31 ficaram com zero métricas por não terem gerado trades. Isso ocorre porque `_metrics`
+  itera somente pelas variantes presentes em `backtest_trades`; não significa que a configuração
+  ou a metodologia da VPS era diferente. Sessenta e oito tiveram 254 datas avaliáveis e CYRE4,
+  RENT4 e VAMO3 tiveram 253 por disponibilidade/calendário do ativo.
 - Um sinal VALE3 de 08/07/2025 foi recalculado após a otimização e manteve exatamente
   status, score 81,5, CALL VALEG565, prêmio máximo, suporte e resistência.
 - `scripts/validate_result_banks.py` valida integridade, run final, contagens e SHA-256 dos bancos.
@@ -283,6 +374,8 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 6. Não existe fila ou backtest na VPS, pois a instância foi excluída.
 7. Os bancos da VPS já estão integrados ao dashboard e o ranking consolidado já foi gerado.
 8. Não escolher apenas o maior número: observar operações, PF, expectativa, estabilidade e drawdown.
+9. Para a verificação diária da cesta, rodar `python scripts/daily_basket_scan.py`; ele já baixa
+   o pregão faltante, avalia os 11 nas duas réguas e avisa por Telegram se algum ativar.
 
 Próximos candidatos líquidos observados em 27/07/2026: PRIO3, BBAS3, GGBR4, WEGE3 e B3SA3.
 BRAV3 tinha volume muito alto, mas exige avaliar continuidade histórica e eventos corporativos antes do anual.
