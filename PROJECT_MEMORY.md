@@ -29,6 +29,9 @@ Atualizado em 30/07/2026, fuso America/Sao_Paulo.
 
 ### VPS Ubuntu temporária
 
+- A instância VPS e seu armazenamento foram excluídos pelo usuário em 30/07/2026, apó a
+  validação dos backups. O antigo IP `18.216.112.18` não deve mais ser usado nem tratado como
+  ambiente disponível. Os 88 GB de dados brutos e o cache remoto foram deliberadamente descartados.
 - VPS criada e acessada em uma sessão separada do Codex; esta sessão do Windows não controla a VPS.
 - A pasta local `vps/` foi criada para conexão e transferência e contém material SSH privado;
   ela e arquivos `*.pem` devem permanecer ignorados pelo Git e nunca enviados ao GitHub.
@@ -271,13 +274,13 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 ## Como retomar rapidamente
 
 1. Ler este arquivo inteiro.
-2. Identificar se a sessão está no Windows local ou na VPS Ubuntu; são ambientes separados.
-3. O backup mínimo da VPS já foi transferido e validado; não repetir. Antes de encerrar a VPS,
-   decidir apenas se os 88 GB brutos/cache também serão preservados para futuros recálculos.
+2. Trabalhar no Windows local; a VPS Ubuntu foi excluída em 30/07/2026 e não existe mais.
+3. O backup mínimo da VPS e o código remoto não commitado já foram transferidos e validados;
+   não repetir. Os 88 GB brutos/cache da VPS foram descartados com a instância.
 4. Garantir que alterações de código e desta memória foram commitadas e enviadas ao GitHub.
 5. No Windows, consultar `http://127.0.0.1:8000/api/health`; se necessário, executar
    `scripts/start_dashboard.ps1`.
-6. A fila da VPS terminou; não existe backtest em andamento confirmado nesta memória.
+6. Não existe fila ou backtest na VPS, pois a instância foi excluída.
 7. Os bancos da VPS já estão integrados ao dashboard e o ranking consolidado já foi gerado.
 8. Não escolher apenas o maior número: observar operações, PF, expectativa, estabilidade e drawdown.
 
