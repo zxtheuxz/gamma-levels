@@ -59,6 +59,16 @@ Atualizado em 30/07/2026, fuso America/Sao_Paulo.
   606.342.028 bytes, SHA-256 `e60163293ca3ef3e68e192b885bb13d591254be8bed5cedaa573ae72b8d80754`.
   O pacote contém os 71 bancos completos, logs, lista, status e manifestos, mas não contém
   `.env.telegram`, dados brutos ou caches. Não é necessário baixá-lo novamente.
+- Antes do encerramento, o código não commitado existente apenas na VPS também foi preservado
+  separadamente em `vps/results/gamma-vps-uncommitted-code-20260730.tar.gz`, SHA-256
+  `d49aba544d836f89d0502db3823001359ec48c838190fe6206040478843ed552`. Ele parte do commit
+  remoto `f5805cf248cdf471935c5130d25adb5dd25458ae` e contém os utilitários `batch_cli.py`,
+  `monitor_cli.py`, `prefetch_cli.py`, ajustes em `b3.py`/`pyproject.toml` e respectivos testes.
+  O pacote foi listado e conferido no Windows sem sobrescrever o código atual.
+- Na verificação final de 30/07/2026 não havia Python de estudo, fila, monitor ou prefetch
+  ativo na VPS; restavam somente processos do sistema e a sessão `tmux`. A API do Windows
+  estava saudável e listava os 75 estudos completos. A VPS pode ser encerrada se não houver
+  interesse em preservar os 88 GB brutos/cache para recálculos futuros.
 
 Endpoints principais:
 
