@@ -1,6 +1,6 @@
 # Memória persistente — Gamma Levels Swing CALL
 
-Atualizado em 26/10/2026, fuso America/Sao_Paulo.
+Atualizado em 03/11/2026, fuso America/Sao_Paulo.
 
 ## Objetivo e decisões do usuário
 
@@ -1309,6 +1309,26 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
     4. **Campeã Fim do Dia (`FIM__PARCIAL_20_50_BE_D5`): `WALL_SUBIU_3D + PERTO_PUT_WALL_4PCT + IV_RANK_BAIXO_55 + FECHOU_TOPO_65` ($n=68$ em 25 ativos EUA):** **Win Rate `86,8%`** (`OOS 72,2% | 12 Virgens 88,5%`), bate `+20%` em **`61,8%` no `D+1`**, EV **+16,49%**, **PF 3,11**.
     5. **Alta Frequência EUA ($n=124$ em 33 ativos): `TRAVA_ABERT_LIM + WALL_SUBIU_1D + WALL_SUBIU_3D + CP_VOL_2.2X + FECHOU_TOPO_75`:** **Win Rate `85,5%`** (`OOS 81,8% | 12 Virgens 86,8%`), EV **+12,46%**, **PF 2,67**.
   - **Leitura Ao Vivo do Scanner EUA hoje (`26/10/2026` via CBOE):** 7 ativos ativados, com destaque para contratos de ticket baixo (`US$ 28 a US$ 122` por contrato de 100 opções): **`SOFI`** (`SOFI261113C00015000` @ `US$ 71` / OTM `$16` @ `US$ 38`, Confluência de 3 regras, WR `88,9%`), **`MARA`** (`MARA261113C00007500` @ `US$ 45` / OTM `$8` @ `US$ 30`, 3 regras, WR `88,9%`), **`BAC`** (`BAC261113C00051000` @ `US$ 122` / OTM `$53` @ `US$ 42`, IV Rank `16%`, C/P Vol `3,67x`, WR `83,8%`), **`F`** (`F261106C00012000` @ `US$ 28`, WR `87,5%`), além das gigantes **`AMZN`** (3 regras, WR `88,9%`), **`SPY`** (2 regras, WR `88,9%`) e **`XOM`** (WR `88,1%`).
+  - **Leitura Ao Vivo do Scanner EUA em `03/11/2026` (via CBOE):** 3 ativos ativados: **`NFLX`** (`Spot $87,25`, Confluência `U1, U3` WR `88,9%` $\to$ `$63C` @ `$1,75` / `$65C` @ `$1,00`), **`PYPL`** (`Spot $59,75`, Confluência `U2, U5` WR `85,5%` $\to$ `$59C` @ `$1,70` / `$61C` @ `$0,87`) e **`AAL`** (`Spot $13,07`, Regra `U7` WR `83,8%` $\to$ `$13C` @ `$0,66` / `$14C` @ `$0,26`).
+- **Sétima Rodada — Arquitetura 100% Nuvem ("Sócio Gamma Levels Cloud": GitHub Actions + n8n AI Agent + Telegram, `03/11/2026`):**
+  - **Motivação de Matheus:** ter o Sócio Antigravity disponível no celular via Telegram mesmo com o PC desligado, recebendo o plano de voo antes da abertura (`09h45`), lembrete de execução/veto na abertura (`10h02`) e fechamento (`18h30/18h35`), além de poder conversar a qualquer hora pelo Telegram consultando os dados reais do repositório GitHub.
+  - **Componentes Implementados e Ativos em Produção:**
+    1. **Cache Leve de Nuvem (`cloud_cache/`, ~6,2 MB versionado no GitHub):**
+       - `cloud_cache/b3_tail35/*.parquet` (últimos 35 pregões dos 45 ativos B3), `cloud_cache/us_tail35/*.parquet` (36 ativos US) e `cloud_cache/_isin_map.json`, permitindo rodar os scanners B3 e US no GitHub Actions em ~15 segundos sem precisar subir os 3 GB de bancos SQLite locais.
+       - `scripts/scan_tiro_rapido_d3.py` e `scripts/scan_us_options_d3.py` foram atualizados para usar `cloud_cache/` automaticamente como fallback quando executados na nuvem.
+    2. **Orquestrador Diário Cloud (`scripts/cloud_daily_runner.py` + `cloud_reports/`):**
+       - Baixa novos arquivos oficiais `PR`/`PE` da B3 (quando disponíveis), roda o Scanner Tiro Rápido B3 (`Fim D0` e `Abertura D+1`) e o Scanner US Options D3 (CBOE ao vivo), atualiza `cloud_cache/`, grava `cloud_reports/latest_daily_briefing.json` e `cloud_reports/latest_daily_briefing.md`, e envia o briefing HTML completo para o Telegram do Matheus (`CHAT_ID=606807164`).
+    3. **GitHub Actions (`.github/workflows/daily_scanner.yml` em `zxtheuxz/gamma-levels`):**
+       - Roda automaticamente de segunda a sexta às **`09h40 BRT`** (`12:40 UTC`) e **`18h30 BRT`** (`21:30 UTC`), além de aceitar disparo manual (`workflow_dispatch`) pelo próprio Agente do Telegram.
+       - Faz commit e push automático dos relatórios atualizados em `cloud_reports/` e `cloud_cache/` de volta para a branch `main`.
+       - Secrets configurados no GitHub: `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`.
+    4. **Agente IA Interativo + Alertas no n8n (`https://n8n-n8n.r7kz3f.easypanel.host/workflow/hsaixBPAtIGLuJHh`):**
+       - **Workflow ID:** `hsaixBPAtIGLuJHh` (`SÓCIO GAMMA LEVELS — TELEGRAM AI & SCANNER`, publicado e ativo na versão `63969ac3-6cce-4fb1-86de-31dd899c2f17`).
+       - **Webhook do Bot Telegram:** `https://n8n-n8n.r7kz3f.easypanel.host/webhook/socio-gamma-telegram` (registrado via `setWebhook` no bot, filtrado exclusivamente para `chat_id == 606807164`).
+       - **Cérebro e Ferramentas:** `OpenRouter Chat Model` (`openai/gpt-4.1-mini`, credencial `IACLOUDVPS`) + `Memoria Conversa Socio` (`memoryBufferWindow` 10 mensagens) + leitura automática pré-carregada de `cloud_reports/latest_daily_briefing.json` + ferramenta `ler_memoria_projeto` (`PROJECT_MEMORY.md` direto do GitHub) + ferramenta `disparar_scanner_github` (`githubTool` que dispara `daily_scanner.yml` no GitHub Actions sob demanda).
+       - **Gatilhos de Horários-Chave B3 (`Gatilho Horarios Chave B3`):** dispara segunda a sexta às **`09h45`**, **`10h02`** e **`18h35` BRT**, lendo `latest_daily_briefing.json` do GitHub e enviando o alerta tático de Pré-Abertura, Abertura (checagem de book/veto) e Fechamento no Telegram.
+    5. **Agendamento Local Antigravity (`schedule` tool):**
+       - Quando o PC do Matheus estiver ligado com o Antigravity aberto, há também dois crons locais ativos (`09h45` e `10h05` BRT, seg-sex) para despertar esta sessão proativamente.
 
 ## Como retomar rapidamente
 
