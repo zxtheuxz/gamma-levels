@@ -110,62 +110,66 @@ def run_us_scan_payload() -> list[dict]:
 
 def format_telegram_briefing(b3_payload: dict, us_signals: list[dict]) -> str:
     eval_dt = b3_payload.get("eval_date", "")
-    next_d1 = b3_payload.get("next_session_d1", "")
     d3_lim = b3_payload.get("session_d3", "")
     m2 = b3_payload.get("mesa2_abert_d1", [])
     m1 = b3_payload.get("mesa1_fim_d0", [])
+    all_b3 = m2 + m1
 
     lines = [
-        f"🚀 <b>SÓCIO GAMMA LEVELS — BRIEFING DIÁRIO</b>",
-        f"📅 <b>Base B3 (D0):</b> <code>{eval_dt}</code> ➡️ <b>Pregão Alvo (D+1):</b> <code>{next_d1}</code> (Time-Stop D+3: <code>{d3_lim}</code>)",
+        f"🌙 <b>FECHAMENTO DO DIA — RADAR B3 &amp; EUA</b>",
+        f"📅 Fechamento Base: <b>{eval_dt}</b>",
         "",
-        "🇧🇷 <b>[B3] MESA 2 — LEILÃO / ABERTURA (09h55–10h15):</b>",
     ]
-    if not m2:
-        lines.append("• <i>Nenhuma ação ativou compra de leilão (Mesa 2) hoje.</i>")
-    else:
-        for i, h in enumerate(m2[:6], 1):
-            br = h["best_rule"]
-            lines.append(
-                f"<b>{i}. {h['ticker']}</b> (Spot R$ {h['spot']:.2f} | Piso D+1 &gt;= R$ {h['min_stock_open_d1']:.2f})\n"
-                f"   🎯 CALL: <code>{h['opt_ticker']}</code> (Strk R$ {h['opt_strike']:.2f} | Venc {h['opt_exp']} | Δ {h['opt_delta']:.2f})\n"
-                f"   📊 Regra <b>{','.join(h['rules'])}</b> (WR <b>{br['wr']:.1f}%</b> | EV +{br['ev']:.1f}%)\n"
-                f"   🟢 Faixa Leilão: <b>R$ {h['ideal_buy_min']:.2f} a R$ {h['ideal_buy_max']:.2f}</b> (Teto +15%: R$ {h['opt_max_open_d1']:.2f})\n"
-                f"   💰 Alvo 1 (+20%): <b>R$ {h['target_20_ref']:.2f}</b> | Alvo 2 (+40%): <b>R$ {h['target_40_ref']:.2f}</b>"
-            )
 
-    lines.append("")
-    lines.append("🇧🇷 <b>[B3] MESA 1 — FIM D0 (Aproveitar na Abertura se abrir na faixa!):</b>")
-    if not m1:
-        lines.append("• <i>Nenhuma ação ativou na Mesa 1 hoje.</i>")
+    if not all_b3:
+        lines.append("🔴 <b>NENHUM ATIVO LIBERADO NA B3 HOJE</b>")
+        lines.append("• Nenhuma opção cumpriu os filtros matemáticos para amanhã.")
     else:
-        for i, h in enumerate(m1[:6], 1):
+        for h in all_b3[:5]:
             br = h["best_rule"]
             min_st = round(h["spot"] * 0.985, 2)
-            lines.append(
-                f"<b>{i}. {h['ticker']}</b> (Fech R$ {h['spot']:.2f} | Piso Abertura &gt;= R$ {min_st:.2f})\n"
-                f"   🎯 CALL: <code>{h['opt_ticker']}</code> (Strk R$ {h['opt_strike']:.2f} | Venc {h['opt_exp']} | Fech R$ {h['opt_close']:.2f})\n"
-                f"   📊 Regra <b>{','.join(h['rules'])}</b> (WR <b>{br['wr']:.1f}%</b> | D+1: {br['hit20_d1']:.0f}% | EV +{br['ev']:.1f}%)\n"
-                f"   🟢 Faixa Boa Abertura: <b>R$ {h['ideal_buy_min']:.2f} a R$ {h['ideal_buy_max']:.2f}</b> (Teto: R$ {h['max_buy_limit']:.2f})\n"
-                f"   💰 Alvo 1 (+20%): <b>R$ {h['target_20']:.2f}</b> | Alvo 2 (+40% c/ BE 0x0): <b>R$ {h['target_40']:.2f}</b>"
-            )
+            ideal_min = h.get("ideal_buy_min", round(h["opt_close"] * 0.95, 2))
+            ideal_max = h.get("ideal_buy_max", round(h["opt_close"] * 1.03, 2))
+            max_lim = h.get("max_buy_limit") or h.get("opt_max_open_d1") or round(h["opt_close"] * 1.05, 2)
+            lim_low = round(ideal_max + 0.01, 2)
+            t20 = h.get("target_20") or h.get("target_20_ref")
+            t40 = h.get("target_40") or h.get("target_40_ref")
+            exp_d3 = h.get("d3_limit_date") or d3_lim
 
-    lines.append("")
-    lines.append(f"🇺🇸 <b>[EUA — CBOE AO VIVO] TOP ATIVAÇÕES ({len(us_signals)} ações):</b>")
+            lines.extend([
+                f"🟢 <b>SINAL PREPARADO P/ AMANHÃ (10h05): <code>{h['opt_ticker']}</code> ({h['ticker']})</b>",
+                "",
+                "🔎 <b>Condição da Ação-Mãe ({0}):</b>".format(h["ticker"]),
+                f"• Fechamento Hoje: <b>R$ {h['spot']:.2f}</b>",
+                f"• Piso mínimo exigido amanhã às 10h05: <b>R$ {min_st:.2f}</b>",
+                f"• Taxa de Acerto do Padrão: <b>{br['wr']:.1f}%</b>",
+                "",
+                f"💵 <b>Tabela de Preço da Opção (<code>{h['opt_ticker']}</code> — Fech R$ {h['opt_close']:.2f}):</b>",
+                f"🟢 <b>R$ {ideal_min:.2f} a R$ {ideal_max:.2f}</b> ➡️ Compra excelente!",
+                f"🟡 <b>R$ {lim_low:.2f} a R$ {max_lim:.2f}</b> ➡️ Compra no limite (aceitável)",
+                f"🔴 <b>Acima de R$ {max_lim:.2f}</b> ➡️ Cara demais (ficar de fora)",
+                "",
+                "🎯 <b>Alvos de Lucro:</b>",
+                f"• <b>Alvo 1 (+20%):</b> R$ {t20:.2f} <i>(realizar metade)</i>",
+                f"• <b>Alvo 2 (+40%):</b> R$ {t40:.2f} <i>(zerar tudo)</i>",
+                f"• <b>Vencimento do Trade:</b> máximo 3 pregões (até {exp_d3})",
+                "",
+            ])
+
+    lines.append("───")
+    lines.append(f"🇺🇸 <b>RADAR OPÇÕES EUA ({len(us_signals)} sinais):</b>")
     if not us_signals:
-        lines.append("• <i>Nenhum sinal ativo na CBOE agora.</i>")
+        lines.append("• Nenhum sinal ativo nos EUA hoje.")
     else:
-        for i, s in enumerate(us_signals[:5], 1):
+        for s in us_signals[:4]:
             c = s["core_atm"]
-            o = s["otm_acessivel"]
+            t20_us = c["mid"] * 1.20
             lines.append(
-                f"<b>{i}. {s['ticker']}</b> (${s['spot']:.2f}, {s['ret_1d_pct']:+.1f}%) | WR <b>{s['best_wr']:.1f}%</b> | C/P Vol {s['cp_vol_ratio']:.1f}x\n"
-                f"   • ATM: <code>{c['option']}</code> (${c['mid']:.2f} = <b>US$ {c['contract_cost_usd']:.0f}</b>) ➡️ +20%: ${c['mid']*1.20:.2f}\n"
-                f"   • OTM: <code>{o['option']}</code> (${o['mid']:.2f} = <b>US$ {o['contract_cost_usd']:.0f}</b>) ➡️ +20%: ${o['mid']*1.20:.2f}"
+                f"🟢 <b>{s['ticker']}</b> (${s['spot']:.2f}) ➡️ Call <code>${c['strike']}C</code> @ <b>US$ {c['mid']:.2f}</b> (Alvo +20%: <b>US$ {t20_us:.2f}</b> | Acerto {s['best_wr']:.1f}%)"
             )
 
     lines.append("")
-    lines.append("💬 <i>Responda aqui no bot a qualquer hora para analisar qualquer ativo ou opção!</i>")
+    lines.append("💬 <i>Às 10h05 de amanhã te mando a validação ao vivo da abertura!</i>")
     return "\n".join(lines)
 
 
