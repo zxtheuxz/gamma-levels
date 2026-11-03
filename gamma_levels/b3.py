@@ -122,6 +122,52 @@ def parse_price_report(outer_blob: bytes, ticker_prefixes: set[str] | None = Non
     return frame
 
 
+def parse_index_report(outer_blob: bytes, tickers: set[str] | None = None) -> pd.DataFrame:
+    """Interpreta o BVBG.087.01 e devolve os valores oficiais dos índices.
+
+    O PriceReport também pode conter instrumentos com nomes parecidos com índices
+    (por exemplo ``IBOV11``), mas esses registros não substituem o fechamento oficial
+    do índice. O IndexReport distingue fechamento, valor do índice e liquidação.
+    """
+    _, inner = _zip_member(outer_blob, ".zip")
+    wanted = {item.upper() for item in tickers} if tickers else None
+    rows: list[dict[str, object]] = []
+    with _xml_stream(inner) as stream:
+        for _, element in iterparse(stream, events=("end",)):
+            if _local_name(element.tag) != "IndxInf":
+                continue
+            raw = _record_values(element)
+            ticker = str(raw.get("TckrSymb") or "").upper()
+            if not ticker or (wanted is not None and ticker not in wanted):
+                continue
+            if not any(raw.get(field) for field in ("ClsgPric", "IndxVal", "SttlmVal")):
+                continue
+            rows.append(
+                {
+                    "trade_date": raw.get("Dt"),
+                    "ticker": ticker,
+                    "description": raw.get("AsstDesc"),
+                    "open": _as_float(raw.get("OpngPric")),
+                    "low": _as_float(raw.get("MinPric")),
+                    "high": _as_float(raw.get("MaxPric")),
+                    "average": _as_float(raw.get("TradAvrgPric")),
+                    "previous_close": _as_float(raw.get("PrvsDayClsgPric")),
+                    "close": _as_float(raw.get("ClsgPric") or raw.get("IndxVal")),
+                    "index_value": _as_float(raw.get("IndxVal")),
+                    "settlement_value": _as_float(raw.get("SttlmVal")),
+                    "change": _as_float(raw.get("OscnVal")),
+                    "rising_assets": _as_float(raw.get("RsngShrsNb")),
+                    "falling_assets": _as_float(raw.get("FlngShrsNb")),
+                    "stable_assets": _as_float(raw.get("StblShrsNb")),
+                }
+            )
+            element.clear()
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        raise B3DataError("Arquivo de índices da B3 não contém os índices solicitados")
+    return frame.drop_duplicates("ticker", keep="first").reset_index(drop=True)
+
+
 def parse_option_reference(outer_blob: bytes, ticker_prefixes: set[str] | None = None) -> pd.DataFrame:
     _, executable = _zip_member(outer_blob, ".ex_")
     # O .ex_ é um arquivo autoextraível. ZipFile lê seu conteúdo sem executá-lo.
@@ -163,28 +209,66 @@ def parse_instruments(outer_blob: bytes) -> pd.DataFrame:
                 continue
             raw = _record_values(element)
             ticker = raw.get("TckrSymb", "").upper()
-            is_option = raw.get("OptnTp") in {"CALL", "PUT"}
-            is_equity = raw.get("SctyCtgy") == "11" and raw.get("CFICd", "").startswith("E")
-            if not ticker or not (is_option or is_equity):
+            cfi_code = raw.get("CFICd", "")
+            option_code = raw.get("OptnTp")
+            is_option = option_code in {"CALL", "PUT", "PUTT"}
+            is_equity = raw.get("SctyCtgy") == "11" and cfi_code.startswith("E")
+            is_etf = raw.get("SctyCtgy") == "3" and cfi_code.startswith("C")
+            is_future = cfi_code.startswith("F") and bool(raw.get("XprtnDt"))
+            if not ticker or not (is_option or is_equity or is_etf or is_future):
                 element.clear()
                 continue
+            isin = raw.get("ISIN")
+            underlying_ticker = None
+            if is_option and isin and str(isin).startswith("BR") and len(str(isin)) >= 7:
+                underlying_ticker = str(isin)[2:7]
+            instrument_type = (
+                "option" if is_option else "future" if is_future else "etf" if is_etf else "equity"
+            )
             rows.append(
                 {
                     "ticker": ticker,
                     "asset_root": raw.get("Asst", "").upper(),
-                    "instrument_type": "option" if is_option else "equity",
-                    "option_type": raw.get("OptnTp", "").lower() if is_option else None,
+                    "instrument_type": instrument_type,
+                    "option_type": ("call" if option_code == "CALL" else "put") if is_option else None,
                     "style": ("european" if raw.get("OptnStyle") == "EURO" else "american") if is_option else None,
                     "expiration": pd.to_datetime(raw.get("XprtnDt"), errors="coerce"),
                     "strike": _as_float(raw.get("ExrcPric")),
                     "lot_size": _as_float(raw.get("AllcnRndLot")),
                     "price_factor": _as_float(raw.get("PricFctr")),
-                    "isin": raw.get("ISIN"),
-                    "cfi_code": raw.get("CFICd"),
+                    "contract_multiplier": _as_float(
+                        raw.get("CtrctMltplr") or raw.get("AllcnRndLot")
+                    ),
+                    "underlying_ticker": underlying_ticker,
+                    "isin": isin,
+                    "cfi_code": cfi_code,
                 }
             )
             element.clear()
-    return pd.DataFrame(rows)
+    return resolve_instrument_underliers(pd.DataFrame(rows))
+
+
+def resolve_instrument_underliers(frame: pd.DataFrame) -> pd.DataFrame:
+    """Normaliza o ticker subjacente usando os ativos listados do próprio IN."""
+    if frame.empty:
+        return frame
+    # Alguns ISINs de opções de ETF codificam uma classe técnica (BOVA9), não
+    # o ticker negociado (BOVA11). Uma raiz com um único ativo listado resolve
+    # o subjacente pelo próprio cadastro; raízes com mais classes preservam o ISIN.
+    listed = frame[frame["instrument_type"].isin(["equity", "etf"])]
+    unique_underliers: dict[str, str] = {}
+    for root, group in listed.groupby("asset_root"):
+        tickers = group["ticker"].astype(str).unique().tolist()
+        canonical_etf = f"{root}11"
+        if canonical_etf in tickers:
+            unique_underliers[str(root)] = canonical_etf
+        elif len(tickers) == 1:
+            unique_underliers[str(root)] = tickers[0]
+    option_mask = frame["instrument_type"].eq("option")
+    mapped = frame.loc[option_mask, "asset_root"].astype(str).map(unique_underliers)
+    resolved = mapped.combine_first(frame.loc[option_mask, "underlying_ticker"])
+    frame.loc[option_mask, "underlying_ticker"] = resolved
+    return frame
 
 
 class B3Client:
@@ -293,7 +377,7 @@ class B3Client:
     def _validate(kind: str, blob: bytes) -> None:
         if not zipfile.is_zipfile(io.BytesIO(blob)):
             raise B3DataError(f"Pacote {kind} inválido ou incompleto")
-        if kind == "PR":
+        if kind in {"PR", "IR"}:
             _, inner = _zip_member(blob, ".zip")
             with _xml_stream(inner) as stream:
                 stream.read(128)
@@ -375,6 +459,15 @@ class B3Client:
         manifest_path = self.raw_dir / trading_date.isoformat() / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         return B3SessionData(trading_date, prices, option_reference, instruments, manifest)
+
+    def load_index_report(
+        self, trading_date: date, tickers: set[str] | None = None
+    ) -> pd.DataFrame:
+        """Baixa e interpreta o IndexReport oficial sem confundi-lo com o PR."""
+        _, frame = self._load_parsed_report(
+            "IR", trading_date, lambda blob: parse_index_report(blob, tickers), tickers
+        )
+        return frame
 
 
 def previous_weekdays(end: date, count: int) -> Iterable[date]:

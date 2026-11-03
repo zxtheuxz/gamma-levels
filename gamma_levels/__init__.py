@@ -3,4 +3,4 @@
 from .core import AnalysisConfig, AnalysisResult, analyze_chain, load_chain
 
 __all__ = ["AnalysisConfig", "AnalysisResult", "analyze_chain", "load_chain"]
-__version__ = "0.2.0"
+__version__ = "0.4.0"

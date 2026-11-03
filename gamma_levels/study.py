@@ -24,6 +24,9 @@ STRATEGIES = (
     "PARTIAL_25_CALCULATED",
 )
 OVERLAP_MODES = ("INDEPENDENT", "SINGLE_POSITION")
+# Saídas de alvo fixo no prêmio: vende a posição inteira no primeiro toque do alvo e,
+# se ele não vier, carrega até o vencimento. Opt-in por `StudyConfig.extra_strategies`.
+TARGET_STRATEGIES = ("TARGET_05", "TARGET_10", "TARGET_15", "TARGET_20", "TARGET_30")
 
 
 @dataclass(slots=True)
@@ -44,12 +47,14 @@ class StudyConfig:
     evaluation_sessions: int = 252
     costs: CostConfig | None = None
     variants: str = "standard_v1"
+    extra_strategies: tuple[str, ...] = ()
     corporate_actions_complete: bool = True
     interest_rates_complete: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["costs"] = asdict(self.costs or CostConfig())
+        value["extra_strategies"] = list(self.extra_strategies)
         return value
 
 
@@ -96,6 +101,7 @@ class AnnualStudy:
         self.database = database
         self.config = config or StudyConfig()
         self.costs = self.config.costs or CostConfig()
+        self.strategies = STRATEGIES + tuple(self.config.extra_strategies)
 
     def run(self, progress: Callable[[str, int], None] | None = None) -> int:
         tell = progress or (lambda _message, _progress: None)
@@ -159,9 +165,9 @@ class AnnualStudy:
             tell("Simulando seis estratégias de saída", 72)
             independent: list[dict[str, Any]] = []
             for trade in all_trades:
-                for strategy in STRATEGIES:
+                for strategy in self.strategies:
                     independent.append(self._simulate_strategy(trade, strategy))
-            portfolio = self._apply_single_position(independent, all_trades)
+            portfolio = self._apply_single_position(independent, all_trades, self.strategies)
             results = independent + portfolio
             self.database.replace_strategy_results(results)
 
@@ -421,7 +427,11 @@ class AnnualStudy:
                         return index + 1, float(value), next_row["trade_date"]
             return None
 
-        if strategy == "HOLD_TO_EXPIRY":
+        if strategy in TARGET_STRATEGIES:
+            # Realização integral no primeiro toque do alvo; sem toque, carrega até o vencimento.
+            hit = target_hit(int(strategy.split("_")[1]) / 100)
+            sales.append((1.0, hit[1], hit[2]) if hit else (1.0, expiry_return, trade["expiration"]))
+        elif strategy == "HOLD_TO_EXPIRY":
             sales.append((1.0, expiry_return, trade["expiration"]))
         elif strategy == "CALCULATED_EXIT":
             calculated = calculated_hit()
@@ -478,12 +488,13 @@ class AnnualStudy:
 
     @staticmethod
     def _apply_single_position(
-        independent: list[dict[str, Any]], trades: list[dict[str, Any]]
+        independent: list[dict[str, Any]], trades: list[dict[str, Any]],
+        strategies: tuple[str, ...] = STRATEGIES,
     ) -> list[dict[str, Any]]:
         trade_map = {trade["trade_id"]: trade for trade in trades}
         rows: list[dict[str, Any]] = []
         for variant in sorted({trade["variant"] for trade in trades}):
-            for strategy in STRATEGIES:
+            for strategy in strategies:
                 source = [
                     row for row in independent
                     if row["strategy"] == strategy and trade_map[row["trade_id"]]["variant"] == variant
@@ -508,7 +519,7 @@ class AnnualStudy:
         output = []
         variants = sorted({trade["variant"] for trade in trades})
         for variant in variants:
-            for strategy in STRATEGIES:
+            for strategy in self.strategies:
                 for overlap in OVERLAP_MODES:
                     source = [
                         row for row in results

@@ -11,15 +11,21 @@ htmlcov/
 resultado/
 resultado_*/
 resultado_excel/
+results/
 data/
 *.db
 *.sqlite
 *.sqlite3
 *.parquet
+!cloud_cache/**/*.parquet
+!cloud_cache/**/*.json
+!cloud_reports/**/*.json
+!cloud_reports/**/*.md
 
 # Arquivos locais, downloads e planilhas
 *.xlsx
 *.xls
+WIN*_F_0_*min.csv
 ~$*
 *.zip
 *.pem

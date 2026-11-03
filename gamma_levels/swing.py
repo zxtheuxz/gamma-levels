@@ -44,6 +44,7 @@ class SwingConfig:
     region_lookback: int = 100
     region_tolerance_atr: float = 0.35
     breakout_volume_min: float = 1.20
+    require_setup: bool = True
     fixed_ticker: str | None = None
     fixed_asset_root: str | None = None
 
@@ -538,7 +539,7 @@ class SwingScanner:
         qualifies = (
             score >= self.config.buy_score
             and rsi_value >= self.config.rsi_entry_floor
-            and setup is not None
+            and (setup is not None or not self.config.require_setup)
             and selected_call is not None
             and reward_risk >= self.config.min_reward_risk
             and conservative_return is not None

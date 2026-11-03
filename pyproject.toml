@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gamma-levels"
-version = "0.3.3"
-description = "Scanner swing de CALLs com dados públicos D-1 da B3"
+version = "0.4.0"
+description = "Scanner swing de CALLs e mapa D-1 de zonas para o índice futuro"
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.24",
