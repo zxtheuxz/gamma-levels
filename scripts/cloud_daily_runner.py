@@ -1,9 +1,9 @@
 """
 Runner Autônomo de Nuvem (GitHub Actions + Telegram + Relatórios para n8n/Gemini)
 =================================================================================
-Executa o Scanner de Tiro Rápido da B3 (45 ações líquidas) e o Scanner de Opções
-dos EUA (36 ações/ETFs na CBOE), atualiza o cache leve `cloud_cache/`, grava os
-relatórios atualizados em `cloud_reports/` e envia o resumo mastigado no Telegram.
+Executa exclusivamente o Scanner de Tiro Rápido da B3 (45 ações líquidas),
+atualiza o cache leve `cloud_cache/`, grava os relatórios atualizados em
+`cloud_reports/` e envia o resumo mastigado no Telegram no estilo Semáforo Visual.
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.scan_tiro_rapido_d3 import LIQUID_45, run_scan_payload  # noqa: E402
-from scripts.scan_us_options_d3 import evaluate_ticker_today  # noqa: E402
 
 
 def load_telegram_creds() -> tuple[str, str]:
@@ -88,27 +87,7 @@ def update_cloud_b3_cache() -> None:
             base_df.to_parquet(p_cloud, index=False)
 
 
-def run_us_scan_payload() -> list[dict]:
-    today = date.today()
-    cache_dir = ROOT / "results" / "us_options" / "cache_v1"
-    parquet_files = sorted(cache_dir.glob("*_us_panel_v1.parquet"))
-    if not parquet_files:
-        parquet_files = sorted((ROOT / "cloud_cache" / "us_tail35").glob("*_us_panel_v1.parquet"))
-
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    hist_map = {pf.name.split("_")[0]: pd.read_parquet(pf) for pf in parquet_files}
-    signals = []
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futs = {ex.submit(evaluate_ticker_today, tk, df_h, today): tk for tk, df_h in hist_map.items()}
-        for f in as_completed(futs):
-            res = f.result()
-            if res is not None:
-                signals.append(res)
-    signals.sort(key=lambda x: (x["n_rules"], x["best_wr"], x["cp_vol_ratio"]), reverse=True)
-    return signals
-
-
-def format_telegram_briefing(b3_payload: dict, us_signals: list[dict]) -> str:
+def format_telegram_briefing(b3_payload: dict) -> str:
     eval_dt = b3_payload.get("eval_date", "")
     d3_lim = b3_payload.get("session_d3", "")
     m2 = b3_payload.get("mesa2_abert_d1", [])
@@ -116,7 +95,7 @@ def format_telegram_briefing(b3_payload: dict, us_signals: list[dict]) -> str:
     all_b3 = m2 + m1
 
     lines = [
-        f"🌙 <b>FECHAMENTO DO DIA — RADAR B3 &amp; EUA</b>",
+        f"🌙 <b>FECHAMENTO DO DIA — RADAR B3</b>",
         f"📅 Fechamento Base: <b>{eval_dt}</b>",
         "",
     ]
@@ -156,30 +135,14 @@ def format_telegram_briefing(b3_payload: dict, us_signals: list[dict]) -> str:
                 "",
             ])
 
-    lines.append("───")
-    lines.append(f"🇺🇸 <b>RADAR OPÇÕES EUA ({len(us_signals)} sinais):</b>")
-    if not us_signals:
-        lines.append("• Nenhum sinal ativo nos EUA hoje.")
-    else:
-        for s in us_signals[:4]:
-            c = s["core_atm"]
-            t20_us = c["mid"] * 1.20
-            lines.append(
-                f"🟢 <b>{s['ticker']}</b> (${s['spot']:.2f}) ➡️ Call <code>${c['strike']}C</code> @ <b>US$ {c['mid']:.2f}</b> (Alvo +20%: <b>US$ {t20_us:.2f}</b> | Acerto {s['best_wr']:.1f}%)"
-            )
-
-    lines.append("")
     lines.append("💬 <i>Às 10h05 de amanhã te mando a validação ao vivo da abertura!</i>")
     return "\n".join(lines)
 
 
 def main() -> None:
-    print("[Cloud Runner] 1/4 Executando Scanner Tiro Rápido B3...")
+    print("[Cloud Runner] 1/3 Executando Scanner Tiro Rápido B3...")
     b3_payload = run_scan_payload(do_download=True)
     update_cloud_b3_cache()
-
-    print("[Cloud Runner] 2/4 Executando Scanner Opções EUA (CBOE)...")
-    us_signals = run_us_scan_payload()
 
     reports_dir = ROOT / "cloud_reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -187,7 +150,6 @@ def main() -> None:
     consolidated = {
         "updated_at": date.today().isoformat(),
         "b3_tiro_rapido": b3_payload,
-        "us_cboe_signals": us_signals,
         "bovak205_position": {
             "ticker": "BOVAK205",
             "qty": 67,
@@ -205,15 +167,15 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    msg = format_telegram_briefing(b3_payload, us_signals)
+    msg = format_telegram_briefing(b3_payload)
     (reports_dir / "latest_daily_briefing.md").write_text(msg, encoding="utf-8")
 
     token, chat_id = load_telegram_creds()
     if "--no-telegram" not in sys.argv:
-        print("[Cloud Runner] 3/4 Enviando briefing no Telegram...")
+        print("[Cloud Runner] 2/3 Enviando briefing no Telegram...")
         ok = send_telegram_message(token, chat_id, msg)
         print(f"[Cloud Runner] Envio Telegram: {'SUCESSO' if ok else 'FALHOU'}")
-    print("[Cloud Runner] 4/4 Concluído!")
+    print("[Cloud Runner] 3/3 Concluído!")
 
 
 if __name__ == "__main__":
