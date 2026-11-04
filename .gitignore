@@ -50,3 +50,5 @@ dashboard/work/
 
 # Backup recuperavel do repositorio Git vazio que existia no dashboard
 .dashboard_git_empty_backup_*/
+
+.venv_mt5/

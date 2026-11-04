@@ -1351,3 +1351,35 @@ dois filtros de volume, scores 75/85 e RR 1,25/2,00.
 
 Próximos candidatos líquidos observados em 27/07/2026: PRIO3, BBAS3, GGBR4, WEGE3 e B3SA3.
 BRAV3 tinha volume muito alto, mas exige avaliar continuidade histórica e eventos corporativos antes do anual.
+
+## Leitura ao vivo via MetaTrader 5 e correcao do n8n (04/11/2026)
+
+- Autorizacao do usuario: posso consultar o MetaTrader 5 aberto a qualquer momento, somente leitura, para ver
+  cotacoes e avaliar dados. Se o MT5 estiver fechado ou deslogado, avisar o usuario para abri-lo.
+- RTD do Profit via Excel/COM voltou `#N/D` ate para PETR4 e WINQ26; nao depender dele. Alternativa que funciona:
+  `.venv_mt5\Scripts\python.exe scripts\mt5_consulta.py SUZB3 SUZBL521` (pacote `MetaTrader5` em venv dedicada,
+  ignorada pelo Git). O MT5 do usuario lista acoes e opcoes B3 ao vivo. Nunca enviar ordens.
+- Fuso: timestamps do MT5 ja estao em horario de Brasilia como epoch; usar `utcfromtimestamp` sem somar fuso.
+- SUZB3 so mostra tick ao vivo se estiver no Market Watch (o script faz `symbol_select`).
+- 04/11/2026 SUZB3 / SUZBL521 (sinal F3): abertura real da acao R$ 51,07 (MT5; Yahoo mostrou 51,00), acima do piso
+  R$ 50,41, entrada VALIDA. Opcao abriu R$ 1,95 (faixa ideal), minima 1,83, maxima 2,75, ultimo 2,53 (~+30%);
+  Alvo 1 (+20%) batido, Alvo 2 (+40%, ~2,73) so tocado na maxima.
+- Bug n8n corrigido (workflow `hsaixBPAtIGLuJHh`): as 09h45 vetou SUZB3 com preco de pre-abertura (50,28) e as 10h05
+  aprovou com o fechamento antigo (51,18) porque o Yahoo ainda devolvia cotacao do dia anterior. Agora: Yahoo em 5m,
+  abertura = primeira barra de hoje, cotacao velha vira `ABERTURA NAO CONFIRMADA`, 09h45 nao veta mais, gatilho
+  10h05 passou para 10h10. O n8n roda na nuvem e nao alcanca o MT5 local.
+
+### Mapa de capacidades do MT5 testado em 04/11/2026 (somente leitura)
+
+- Conta Genial (`GenialInvestimentos-PRD`); `trade_allowed=False` e DLL desligada: a API nao opera, so le.
+- Funciona: cotacao ao vivo, book com 20 niveis (precisa ~2 s apos `market_book_add`), ticks de negocio (`COPY_TICKS_TRADE`;
+  SUZB3 42.617 em 3 dias), OHLC D1/M5/M1, cadeia de opcoes por prefixo (`symbols_get("SUZB*")`) com strike, vencimento,
+  tipo e ativo-base. SUZB3: 2.486 D1 desde 2016, 50.000 M5 desde 07/2024, 50.000 M1 desde 05/2026.
+- Limites: historico de opcoes e curto (SUZBL521: 98 D1, ~800 M5); varias calls ilíquidas vem com bid/ask zerado; `COPY_TICKS_ALL`
+  na ultima hora voltou vazio (ajustar janela).
+- Uso: so quando o MT5 esta aberto e logado. Nao ha alerta automatico; o usuario abre o MT5 as 09h e 10h e me chama para validar
+  (abertura real, veto -1,5%, faixa de preco da opcao, book, spread). Se estiver fechado, pedir para abrir.
+- `symbol_select` altera o Market Watch do usuario: ao ler cadeia, remover depois o que foi adicionado (feito em 04/11:
+  111 calls SUZB removidas; ficaram SUZB3 e SUZBL521).
+
+- Descartado em 04/11/2026: a Genial nao aceita VPS e o VPS da MetaQuotes so roda Expert Advisors (sem acesso remoto nem Python), entao nao serve para ler o MT5 de fora. Rotina decidida: n8n, GitHub Actions e Telegram seguem automaticos; o usuario abre o MT5 e me chama para validar as 09h e 10h.
